@@ -5,12 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tamim's Expense Tracker - Premium</title>
     
-    <!-- PDF Generation Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -52,7 +49,6 @@
             position: relative;
         }
 
-        /* Animated RGB Glow Border */
         .container::before {
             content: '';
             position: absolute;
@@ -153,7 +149,6 @@
             padding-right: 5px;
         }
 
-        /* Scrollbar styles */
         .expense-list::-webkit-scrollbar { width: 6px; }
         .expense-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
         .expense-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
@@ -237,7 +232,6 @@
         .btn-clear { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.2); grid-column: span 2; }
         .btn-clear:hover { background: rgba(255, 51, 102, 0.2); border-color: #ff3366; color: #ff3366; }
 
-        /* Notification Toast */
         .toast {
             position: fixed;
             top: 20px;
@@ -258,13 +252,11 @@
 
         .toast.show { right: 20px; }
 
-        /* Printable Area Styles */
         #printable-area { background: var(--card-bg); }
     </style>
 </head>
 <body>
 
-<!-- Notification Toast -->
 <div class="toast" id="toast">
     <i class="fas fa-check-circle" style="color: var(--primary);"></i>
     <span id="toast-msg">আপডেট সম্পন্ন হয়েছে!</span>
@@ -276,11 +268,6 @@
         <p class="subtitle">পার্সোনাল এক্সপেন্স ক্যালকুলেটর (Premium Edition)</p>
     </div>
 
-    <!-- 
-    ==========================================================
-    হিন্টস: নতুন খরচ যোগ করার নিয়ম (প্লেসহোল্ডারে বাংলা উদাহরণ)
-    ==========================================================
-    -->
     <div class="input-group" data-html2canvas-ignore="true">
         <label>খরচের বিবরণ</label>
         <input type="text" id="reason" placeholder="উদা: মেসের ভাড়া, বাজার, মোবাইল রিচার্জ...">
@@ -295,9 +282,7 @@
         <i class="fas fa-plus-circle"></i> হিসাব যোগ করুন
     </button>
 
-    <div class="expense-list" id="list">
-        <!-- খরচের তালিকা এখানে দেখাবে -->
-    </div>
+    <div class="expense-list" id="list"></div>
 
     <div class="total-box">
         সর্বমোট: ৳ <span id="total-amount">0</span>
@@ -310,7 +295,7 @@
         <button class="btn-action btn-tele" onclick="syncToCloud('Telegram')">
             <i class="fab fa-telegram-plane"></i> Sync to Bot
         </button>
-        <button class="btn-action btn-drive" onclick="syncToCloud('Google Drive')">
+        <button class="btn-action btn-drive" onclick="uploadToDrive()">
             <i class="fab fa-google-drive"></i> Save to Drive
         </button>
         <button class="btn-action btn-clear" onclick="clearData()">
@@ -320,18 +305,16 @@
 </div>
 
 <script>
-    // ==========================================================
-    // [হিন্ট] নিচে ডিফল্ট খরচের তালিকা দেওয়া আছে।
-    // আপনি চাইলে এখানে নতুন অবজেক্ট যোগ করে নিজের হিসাব বসাতে পারেন।
-    // গঠন: { name: "খরচের নাম", price: টাকার_পরিমাণ }
-    // যেমন: { name: "বাসা থেকে আসার সময় (বাস টিকেট)", price: 1000 }
-    // ==========================================================
+    // ==========================================
+    // কনফিগ: আপনার Google Apps Script ওয়েব অ্যাপ URL টি এখানে বসান
+    // ==========================================
+    const GOOGLE_DRIVE_UPLOAD_URL = 'YOUR_WEB_APP_URL'; // ← এখানে বসান আপনার কপি করা URL (শেষে /exec সহ)
+
     const defaultExpenses = [
         { name: "ভর্তির সময় (বাসা থেকে)", price: 63000 },
         { name: "ঢাকা আসার সময় (ভর্তি)", price: 5000 },
         { name: "ঢাকা আসা (ক্লাসের জন্য)", price: 5500 },
         { name: "নতুন বাসার জন্য", price: 10000 },
-        // ---------- নতুন সংযোজিত হিসাব ----------
         { name: "বাসা থেকে আসার সময় (বাস টিকেট)", price: 1000 },
         { name: "আসার দিন আনা টাকা", price: 4000 },
         { name: "আব্বুর বিকাশ (৮০০০ টাকা)", price: 8000 }
@@ -339,24 +322,18 @@
 
     let expenses = [];
     
-    // লোকাল স্টোরেজ থেকে পূর্বের ডাটা লোড করা (যদি থাকে)
     try {
         let saved = localStorage.getItem('tamim_expenses');
         if (saved) {
             expenses = JSON.parse(saved);
         }
-    } catch(e) {
-        console.error("Error reading localStorage", e);
-    }
+    } catch(e) {}
 
-    // যদি কোনো ডাটা না থাকে, তাহলে ডিফল্ট তালিকা সেট করা
     if (!Array.isArray(expenses) || expenses.length === 0) {
-        // ডিপ কপি যাতে মূল অ্যারে নষ্ট না হয়
-        expenses = JSON.parse(JSON.stringify(defaultExpenses)); 
+        expenses = JSON.parse(JSON.stringify(defaultExpenses));
         localStorage.setItem('tamim_expenses', JSON.stringify(expenses));
     }
 
-    // টোস্ট মেসেজ দেখানোর ফাংশন
     function showToast(message) {
         const toast = document.getElementById('toast');
         document.getElementById('toast-msg').innerText = message;
@@ -364,7 +341,6 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
-    // UI আপডেট করে তালিকা ও টোটাল দেখায়
     function updateUI() {
         const listElement = document.getElementById('list');
         const totalElement = document.getElementById('total-amount');
@@ -385,7 +361,6 @@
         localStorage.setItem('tamim_expenses', JSON.stringify(expenses));
     }
 
-    // নতুন খরচ যোগ করার ফাংশন
     function addExpense() {
         const name = document.getElementById('reason').value;
         const price = document.getElementById('amount').value;
@@ -393,21 +368,14 @@
         if(name && price) {
             expenses.push({ name: name, price: parseFloat(price) });
             updateUI();
-            
-            // ইনপুট ফিল্ড ক্লিয়ার
             document.getElementById('reason').value = '';
             document.getElementById('amount').value = '';
-            
             showToast("নতুন হিসাব যোগ করা হয়েছে!");
-            
-            // অটোমেটিক ক্লাউড সিঙ্ক (ওয়েবহুক) – নিজের সার্ভার থাকলে এখানে বদলাতে পারেন
-            autoSyncWebhook();
         } else {
             alert("দয়া করে খরচের নাম এবং টাকার পরিমাণ দুইটাই লিখুন!");
         }
     }
 
-    // সব ডাটা মুছে ফেলা
     function clearData() {
         if(confirm("আপনি কি নিশ্চিত যে সব হিসাব মুছে ফেলতে চান?")) {
             expenses = [];
@@ -416,25 +384,21 @@
         }
     }
 
-    // PDF ডাউনলোড
+    // সাধারণ PDF ডাউনলোড
     function downloadPDF() {
         showToast("PDF তৈরি হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...");
-        
         const { jsPDF } = window.jspdf;
         const element = document.querySelector("#printable-area");
-        
-        // অস্থায়ী স্টাইল পরিবর্তন যাতে PDF সুন্দর দেখায়
         const originalBg = element.style.background;
         element.style.background = "#0f0c29";
         element.style.padding = "20px";
         element.style.borderRadius = "0";
 
         html2canvas(element, {
-            scale: 2, // High resolution
+            scale: 2,
             useCORS: true,
             backgroundColor: "#0f0c29"
         }).then(canvas => {
-            // স্টাইল আগের অবস্থায় ফেরত
             element.style.background = originalBg;
             element.style.padding = "30px";
             element.style.borderRadius = "20px";
@@ -444,29 +408,83 @@
             const imgProps= pdf.getImageProperties(imgData);
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-            
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
             pdf.save("Tamims_Expense_Report.pdf");
-            
             showToast("PDF ডাউনলোড সম্পন্ন হয়েছে!");
         });
     }
 
-    // ক্লাউড সিঙ্ক (টেলিগ্রাম/ড্রাইভ) – বর্তমানে ডেমো, প্রয়োজনে ওয়েবহুক বসান
+    // ==========================================
+    // Google Drive-এ PDF আপলোডের ফাংশন
+    // ==========================================
+    async function uploadToDrive() {
+        if (GOOGLE_DRIVE_UPLOAD_URL === 'YOUR_WEB_APP_URL') {
+            alert("অনুগ্রহ করে প্রথমে Google Apps Script-এর Web App URL বসান। উপরের কনফিগ সেকশন দেখুন।");
+            return;
+        }
+
+        showToast("PDF তৈরি ও Drive-এ আপলোড হচ্ছে...");
+        
+        const { jsPDF } = window.jspdf;
+        const element = document.querySelector("#printable-area");
+        const originalBg = element.style.background;
+        element.style.background = "#0f0c29";
+        element.style.padding = "20px";
+        element.style.borderRadius = "0";
+
+        try {
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#0f0c29"
+            });
+
+            element.style.background = originalBg;
+            element.style.padding = "30px";
+            element.style.borderRadius = "20px";
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgProps= pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            
+            // PDF কে বেস64 স্ট্রিং এ রূপান্তর (ডেটা ইউআরএল থেকে বেস64 অংশ নিন)
+            const pdfBase64 = pdf.output('datauristring').split(',')[1];
+            
+            // Apps Script-এ পাঠানোর জন্য ফাইল নাম তৈরি (বর্তমান তারিখসহ)
+            const now = new Date();
+            const fileName = `Tamims_Expense_${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}.pdf`;
+
+            // পোস্ট রিকুয়েস্ট
+            const response = await fetch(GOOGLE_DRIVE_UPLOAD_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    base64: pdfBase64,
+                    fileName: fileName
+                })
+            });
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                showToast("সফলভাবে Drive-এ আপলোড হয়েছে!");
+                console.log("File URL:", result.fileUrl);
+            } else {
+                showToast("আপলোড ব্যর্থ: " + result.message);
+            }
+        } catch (error) {
+            console.error(error);
+            showToast("আপলোডে সমস্যা হয়েছে।");
+        }
+    }
+
     function syncToCloud(platform) {
         showToast(`Preparing to sync with ${platform}...`);
-        setTimeout(() => {
-            showToast(`Data Synced to ${platform} successfully!`);
-        }, 1000);
+        // Telegram sync (চাইলে পরবর্তীতে বসাতে পারেন)
     }
 
-    // অটো সিঙ্ক ব্যাকগ্রাউন্ড ফাংশন (আপনার ওয়েবহুক লিংক এখানে বসান)
-    function autoSyncWebhook() {
-        console.log("Auto sync triggered in background...");
-        // এখানে fetch('your-webhook-url', { method: 'POST', body: JSON.stringify(expenses) }) দিতে পারেন
-    }
-
-    // শুরুতে UI লোড করা
     updateUI();
 </script>
 
