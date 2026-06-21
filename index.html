@@ -276,9 +276,14 @@
         <p class="subtitle">পার্সোনাল এক্সপেন্স ক্যালকুলেটর (Premium Edition)</p>
     </div>
 
+    <!-- 
+    ==========================================================
+    হিন্টস: নতুন খরচ যোগ করার নিয়ম (প্লেসহোল্ডারে বাংলা উদাহরণ)
+    ==========================================================
+    -->
     <div class="input-group" data-html2canvas-ignore="true">
         <label>খরচের বিবরণ</label>
-        <input type="text" id="reason" placeholder="উদা: ডাইনিং খরচ, যাতায়াত...">
+        <input type="text" id="reason" placeholder="উদা: মেসের ভাড়া, বাজার, মোবাইল রিচার্জ...">
     </div>
     
     <div class="input-group" data-html2canvas-ignore="true">
@@ -291,7 +296,7 @@
     </button>
 
     <div class="expense-list" id="list">
-        <!-- Expenses will be injected here -->
+        <!-- খরচের তালিকা এখানে দেখাবে -->
     </div>
 
     <div class="total-box">
@@ -315,17 +320,26 @@
 </div>
 
 <script>
-    // ডিফল্ট ডাটা
+    // ==========================================================
+    // [হিন্ট] নিচে ডিফল্ট খরচের তালিকা দেওয়া আছে।
+    // আপনি চাইলে এখানে নতুন অবজেক্ট যোগ করে নিজের হিসাব বসাতে পারেন।
+    // গঠন: { name: "খরচের নাম", price: টাকার_পরিমাণ }
+    // যেমন: { name: "বাসা থেকে আসার সময় (বাস টিকেট)", price: 1000 }
+    // ==========================================================
     const defaultExpenses = [
         { name: "ভর্তির সময় (বাসা থেকে)", price: 63000 },
         { name: "ঢাকা আসার সময় (ভর্তি)", price: 5000 },
         { name: "ঢাকা আসা (ক্লাসের জন্য)", price: 5500 },
-        { name: "নতুন বাসার জন্য", price: 10000 }
+        { name: "নতুন বাসার জন্য", price: 10000 },
+        // ---------- নতুন সংযোজিত হিসাব ----------
+        { name: "বাসা থেকে আসার সময় (বাস টিকেট)", price: 1000 },
+        { name: "আসার দিন আনা টাকা", price: 4000 },
+        { name: "আব্বুর বিকাশ (৮০০০ টাকা)", price: 8000 }
     ];
 
     let expenses = [];
     
-    // চেক করা হচ্ছে লোকাল স্টোরেজে কোনো ডেটা আছে কি না
+    // লোকাল স্টোরেজ থেকে পূর্বের ডাটা লোড করা (যদি থাকে)
     try {
         let saved = localStorage.getItem('tamim_expenses');
         if (saved) {
@@ -335,13 +349,14 @@
         console.error("Error reading localStorage", e);
     }
 
-    // যদি লিস্ট ফাঁকা থাকে বা লোকাল স্টোরেজে কিছু না থাকে, তাহলে ডিফল্ট ডাটা বসিয়ে দেওয়া
+    // যদি কোনো ডাটা না থাকে, তাহলে ডিফল্ট তালিকা সেট করা
     if (!Array.isArray(expenses) || expenses.length === 0) {
-        // Deep copy of default array so we don't modify the original
+        // ডিপ কপি যাতে মূল অ্যারে নষ্ট না হয়
         expenses = JSON.parse(JSON.stringify(defaultExpenses)); 
         localStorage.setItem('tamim_expenses', JSON.stringify(expenses));
     }
 
+    // টোস্ট মেসেজ দেখানোর ফাংশন
     function showToast(message) {
         const toast = document.getElementById('toast');
         document.getElementById('toast-msg').innerText = message;
@@ -349,6 +364,7 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
+    // UI আপডেট করে তালিকা ও টোটাল দেখায়
     function updateUI() {
         const listElement = document.getElementById('list');
         const totalElement = document.getElementById('total-amount');
@@ -369,6 +385,7 @@
         localStorage.setItem('tamim_expenses', JSON.stringify(expenses));
     }
 
+    // নতুন খরচ যোগ করার ফাংশন
     function addExpense() {
         const name = document.getElementById('reason').value;
         const price = document.getElementById('amount').value;
@@ -377,19 +394,20 @@
             expenses.push({ name: name, price: parseFloat(price) });
             updateUI();
             
-            // ইনপুট ফিল্ড ক্লিয়ার করা
+            // ইনপুট ফিল্ড ক্লিয়ার
             document.getElementById('reason').value = '';
             document.getElementById('amount').value = '';
             
             showToast("নতুন হিসাব যোগ করা হয়েছে!");
             
-            // অটোমেটিক ক্লাউড সিঙ্ক
+            // অটোমেটিক ক্লাউড সিঙ্ক (ওয়েবহুক) – নিজের সার্ভার থাকলে এখানে বদলাতে পারেন
             autoSyncWebhook();
         } else {
             alert("দয়া করে খরচের নাম এবং টাকার পরিমাণ দুইটাই লিখুন!");
         }
     }
 
+    // সব ডাটা মুছে ফেলা
     function clearData() {
         if(confirm("আপনি কি নিশ্চিত যে সব হিসাব মুছে ফেলতে চান?")) {
             expenses = [];
@@ -398,14 +416,14 @@
         }
     }
 
-    // PDF Download function using html2canvas & jsPDF
+    // PDF ডাউনলোড
     function downloadPDF() {
         showToast("PDF তৈরি হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...");
         
         const { jsPDF } = window.jspdf;
         const element = document.querySelector("#printable-area");
         
-        // সাময়িক ভাবে স্টাইল পরিবর্তন করা যেন PDF ভালো আসে
+        // অস্থায়ী স্টাইল পরিবর্তন যাতে PDF সুন্দর দেখায়
         const originalBg = element.style.background;
         element.style.background = "#0f0c29";
         element.style.padding = "20px";
@@ -416,7 +434,7 @@
             useCORS: true,
             backgroundColor: "#0f0c29"
         }).then(canvas => {
-            // রিভার্ট স্টাইল
+            // স্টাইল আগের অবস্থায় ফেরত
             element.style.background = originalBg;
             element.style.padding = "30px";
             element.style.borderRadius = "20px";
@@ -434,17 +452,18 @@
         });
     }
 
-    // Auto Sync / Cloud Webhook function
+    // ক্লাউড সিঙ্ক (টেলিগ্রাম/ড্রাইভ) – বর্তমানে ডেমো, প্রয়োজনে ওয়েবহুক বসান
     function syncToCloud(platform) {
         showToast(`Preparing to sync with ${platform}...`);
-        
         setTimeout(() => {
             showToast(`Data Synced to ${platform} successfully!`);
         }, 1000);
     }
 
+    // অটো সিঙ্ক ব্যাকগ্রাউন্ড ফাংশন (আপনার ওয়েবহুক লিংক এখানে বসান)
     function autoSyncWebhook() {
         console.log("Auto sync triggered in background...");
+        // এখানে fetch('your-webhook-url', { method: 'POST', body: JSON.stringify(expenses) }) দিতে পারেন
     }
 
     // শুরুতে UI লোড করা
